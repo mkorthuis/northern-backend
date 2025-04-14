@@ -1,0 +1,22 @@
+file_settings:
+  default_input: "../assets/2024-school-metrics.xlsx"
+  2021_input: "../assets/2021-school-metrics.xlsx"
+  2018_input: "../assets/2018-school-metrics.xlsx"
+  sql_cache_dir: "../sql_cache"
+  file_years:
+    default_input: ["2022", "2023", "2024"]
+    2021_input: ["2019", "2020", "2021"]
+    2018_input: ["2016", "2017", "2018"]
+  
+column_mappings:
+  entity_id: "Entity ID"
+  entity_name: "Entity Name"
+  entity_type: "School / District"
+  indicator_category: "Indicator Category"
+  indicator_name: "Indicator Name"
+  measurement_years: ["2022", "2023", "2024"]
+
+special_values:
+  null_values: ["NA", "N/A", "*N", "*CS"]
+  skip_patterns: ["*CS"]
+

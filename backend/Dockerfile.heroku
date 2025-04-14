@@ -1,0 +1,19 @@
+FROM python:3.13
+
+WORKDIR /app/
+
+COPY ./requirements.txt /app/
+COPY ./scripts /app/scripts
+COPY ./alembic.ini /app/
+COPY ./app /app/app
+
+ENV PYTHONUNBUFFERED=1
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH=/app
+
+RUN pip install -r requirements.txt
+
+RUN chmod +x /app/scripts/start-heroku.sh
+
+# Change the CMD to use the startup script
+CMD ["/app/scripts/start-heroku.sh"]

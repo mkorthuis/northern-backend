@@ -1,0 +1,52 @@
+file_settings:
+  school_file:
+    path: "../assets/2025-school-list.xls"
+    start_row: 2  # 0-based index, skip header row
+  district_file:
+    path: "../assets/2025-district-list.csv"
+  sau_file:
+    path: "../assets/2025-sau-list.xls"
+    start_row: 4  # 0-based index, skip header row
+  sql_cache_dir: "../sql_cache"
+
+column_mappings:
+  # School file mappings
+  district_id: 0
+  district_name: 1
+  school_id: 2
+  school_name: 3
+  open_date: 4
+  principal_first_name: 5
+  principal_middle_initial: 6
+  principal_last_name: 7
+  principal_title: 8
+  address1: 9
+  address2: 10
+  city: 11
+  state: 12
+  zip: 13
+  phone: 14
+  fax: 15
+  email: 16
+  county: 17
+  region_name: 18
+  school_group: 19
+  school_type: 20
+  school_type_desc: 21
+  school_approval_level: 22
+  school_approval_level_desc: 23
+  grade_span: 24
+  sau_id: 25
+  sau_name: 26
+  admin_type: 27  
+  group_id: 28
+  webpage: 30
+
+district_file_mappings:
+  district_id: "District Id"
+  district_name: "District"
+  town_id: "Town Id"
+  town_name: "Town"
+  sau_id: "sau_id"
+  sau_name: "sau_name"
+  

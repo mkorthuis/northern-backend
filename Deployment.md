@@ -1,4 +1,4 @@
-# NH Facts - Heroku Deployment Guide
+# Northern Intel - Heroku Deployment Guide
 
 ## 1. Initial Setup
 ```bash
@@ -30,10 +30,10 @@ heroku pg:info
 ## 3. Environment Configuration
 ```bash
 # Project settings
-heroku config:set PROJECT_NAME="NH Facts"
-heroku config:set STACK_NAME=nh-facts-ai
-heroku config:set FRONTEND_HOST=https://nh-facts.michaelkorthuis.com
-heroku config:set BACKEND_CORS_ORIGINS="http://localhost,http://localhost:5174,https://localhost,https://localhost:5174,https://nh-facts.michaelkorthuis.com,https://www.nh-facts.com"
+heroku config:set PROJECT_NAME="Northern Intel"
+heroku config:set STACK_NAME=northern-intel
+heroku config:set FRONTEND_HOST=https://www.northernintel.com
+heroku config:set BACKEND_CORS_ORIGINS="http://localhost,http://localhost:5174,https://localhost,https://localhost:5174,https://www.northernintelcom,https://www.northernintel.com"
 heroku config:set SECRET_KEY=updatethis
 
 # Get DATABASE_URL parts and set database configuration

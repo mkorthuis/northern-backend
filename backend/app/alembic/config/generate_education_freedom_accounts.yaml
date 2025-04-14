@@ -1,5 +1,0 @@
-file_settings:
-  default_input: "../assets/education-freedom-account/education-freedom-account-****.xlsx"
-  year_start: 2022
-  year_end: 2025
-  sql_cache_dir: "../sql_cache" 

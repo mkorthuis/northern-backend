@@ -1,5 +1,0 @@
-file_settings:
-  default_input: "../assets/safety/safety-****.xlsx"
-  year_start: 2016
-  year_end: 2024
-  sql_cache_dir: "../sql_cache" 

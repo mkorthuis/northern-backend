@@ -1,13 +1,15 @@
-from fastapi import APIRouter, Query, Path, status
+from fastapi import APIRouter, Query, Path, status, Depends
 from typing import List, Optional
 from uuid import UUID
+from datetime import datetime
 
 from app.api.v1.deps import SessionDep
 from app.schema.survey_schema import (
     SurveyGet, SurveyResponseGet, SurveyCreate, SurveyUpdate,
     SurveyResponseCreate, SurveyResponseUpdate,
     QuestionGet, QuestionCreate, QuestionUpdate,
-    BulkSurveyResponseCreate
+    BulkSurveyResponseCreate, PaginationParams, SurveyResponseFilter,
+    PaginatedSurveyResponses
 )
 from app.service.public.survey_service import survey_service
 
@@ -233,28 +235,37 @@ def delete_survey_response(
     )
 
 @router.get("/{survey_id}/responses", 
-    response_model=List[SurveyResponseGet],
+    response_model=PaginatedSurveyResponses,
     summary="Get survey responses",
-    description="Retrieves all responses for a specific survey, optionally filtered to completed responses only",
-    response_description="List of survey responses")
+    description="Retrieves all responses for a specific survey with pagination and filtering options",
+    response_description="Paginated list of survey responses")
 def get_survey_responses(
     survey_id: UUID = Path(..., description="The ID of the survey to get responses for"),
     session: SessionDep = SessionDep,
-    completed_only: bool = Query(False, description="If true, only return completed responses")
+    pagination: PaginationParams = Depends(),
+    filters: SurveyResponseFilter = Depends()
 ):
     """
-    Get all responses for a specific survey, optionally filtered to completed responses only.
+    Get responses for a specific survey with pagination and filtering options.
     
     Parameters:
     - **survey_id**: UUID of the survey to get responses for
-    - **completed_only**: Optional flag to only return completed responses
+    - **page**: Page number (starts from 1)
+    - **page_size**: Number of items per page (max 100)
+    - **completed_only**: If true, only return completed responses
+    - **started_after**: Filter responses started after this datetime
+    - **started_before**: Filter responses started before this datetime
+    - **respondent_id**: Filter by specific respondent
+    - **search_term**: Search in response metadata
     
-    Returns a list of survey responses ordered by start time (newest first).
+    Returns a paginated list of survey responses ordered by start time (newest first).
     """
     return survey_service.get_survey_responses(
         session=session, 
         survey_id=survey_id,
-        completed_only=completed_only
+        page=pagination.page,
+        page_size=pagination.page_size,
+        filter_params=filters
     )
 
 @router.post("/response/bulk", 

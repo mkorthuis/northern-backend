@@ -189,6 +189,30 @@ class BulkSurveyResponseCreate(BaseModel):
     responses: List[SurveyResponseCreate]
     batch_metadata: Optional[Dict[str, Any]] = None
 
+# Pagination and filtering schemas
+class PaginationParams(BaseModel):
+    """Common pagination parameters"""
+    page: int = Field(1, description="Page number (1-indexed)", ge=1)
+    page_size: int = Field(50, description="Number of items per page", ge=1, le=100)
+
+class SurveyResponseFilter(BaseModel):
+    """Filter parameters for survey responses"""
+    completed_only: bool = Field(False, description="Filter to only completed responses")
+    started_after: Optional[datetime] = Field(None, description="Filter responses started after this datetime")
+    started_before: Optional[datetime] = Field(None, description="Filter responses started before this datetime")
+    respondent_id: Optional[UUID] = Field(None, description="Filter by specific respondent")
+    search_term: Optional[str] = Field(None, description="Search in response metadata")
+
+class PaginatedSurveyResponses(BaseModel):
+    """Paginated survey response results"""
+    items: List[SurveyResponseGet]
+    total: int
+    page: int
+    page_size: int
+    pages: int
+    has_previous: bool
+    has_next: bool
+
 # Question update schema
 class QuestionUpdate(BaseModel):
     title: Optional[str] = None

@@ -3,6 +3,7 @@ from sqlmodel import Session, select, delete
 from fastapi import HTTPException
 from uuid import UUID
 import datetime
+import sqlalchemy
 
 from app.model.survey import (
     Survey, SurveyResponse, Answer, SurveySection, 
@@ -97,18 +98,22 @@ class SurveyService:
         self,
         session: Session,
         survey_id: UUID,
-        completed_only: bool = False
-    ) -> List[SurveyResponseGet]:
+        page: int = 1,
+        page_size: int = 50,
+        filter_params: Optional[Any] = None
+    ) -> Dict[str, Any]:
         """
-        Get all responses for a specific survey.
+        Get all responses for a specific survey with pagination and filtering.
         
         Args:
             session: Database session
             survey_id: ID of the survey to get responses for
-            completed_only: If True, only return completed responses
+            page: Page number (1-indexed)
+            page_size: Number of items per page
+            filter_params: Optional filter parameters
             
         Returns:
-            List of survey responses
+            Paginated list of survey responses
             
         Raises:
             HTTPException: If the survey is not found
@@ -118,16 +123,61 @@ class SurveyService:
         if not survey_exists:
             raise HTTPException(status_code=404, detail=f"Survey with ID {survey_id} not found")
         
+        # Build the base query
         statement = select(SurveyResponse).where(SurveyResponse.survey_id == survey_id)
         
-        if completed_only:
-            statement = statement.where(SurveyResponse.is_complete == True)
+        # Apply filters if provided
+        if filter_params:
+            if filter_params.completed_only:
+                statement = statement.where(SurveyResponse.is_complete == True)
             
-        # Order by start time, newest first
+            if filter_params.started_after:
+                statement = statement.where(SurveyResponse.started_at >= filter_params.started_after)
+                
+            if filter_params.started_before:
+                statement = statement.where(SurveyResponse.started_at <= filter_params.started_before)
+                
+            if filter_params.respondent_id:
+                statement = statement.where(SurveyResponse.respondent_id == filter_params.respondent_id)
+                
+            if filter_params.search_term:
+                # Search in metadata using JSONB containment
+                # This assumes the metadata might contain the search term as a value
+                # For more advanced text search, consider using PostgreSQL's full-text search capabilities
+                search_term = f"%{filter_params.search_term}%"
+                search_condition = sqlalchemy.text("metadata::text ILIKE :search_term").bindparams(search_term=search_term)
+                statement = statement.where(search_condition)
+        
+        # Count total items for pagination
+        count_statement = select(sqlalchemy.func.count()).select_from(statement.subquery())
+        total_items = session.exec(count_statement).one()
+        
+        # Calculate pagination values
+        total_pages = (total_items + page_size - 1) // page_size  # Ceiling division
+        offset = (page - 1) * page_size
+        
+        # Order by start time, newest first and apply pagination
         statement = statement.order_by(SurveyResponse.started_at.desc())
-            
+        statement = statement.offset(offset).limit(page_size)
+        
+        # Execute query
         responses = session.exec(statement).all()
-        return [SurveyResponseGet.from_orm(response) for response in responses]
+        
+        # Convert to schema objects
+        response_items = [SurveyResponseGet.from_orm(response) for response in responses]
+        
+        # Build the paginated response
+        result = {
+            "items": response_items,
+            "total": total_items,
+            "page": page,
+            "page_size": page_size,
+            "pages": total_pages,
+            "has_previous": page > 1,
+            "has_next": page < total_pages
+        }
+        
+        return result
 
     def get_question(
         self,

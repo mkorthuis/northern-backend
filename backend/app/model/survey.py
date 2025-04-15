@@ -23,7 +23,6 @@ class Survey(UUIDBaseMixin, table=True):
     survey_start: Optional[datetime] = None
     survey_end: Optional[datetime] = None
     is_active: bool = Field(default=True)
-    
     # Relationships
     sections: List["SurveySection"] = Relationship(back_populates="survey")
     questions: List["Question"] = Relationship(back_populates="survey")

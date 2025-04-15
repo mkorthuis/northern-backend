@@ -5,7 +5,8 @@ from uuid import UUID
 from app.api.v1.deps import SessionDep
 from app.schema.survey_schema import (
     SurveyGet, SurveyResponseGet, SurveyCreate, SurveyUpdate,
-    SurveyResponseCreate, SurveyResponseUpdate
+    SurveyResponseCreate, SurveyResponseUpdate,
+    QuestionGet, QuestionCreate, QuestionUpdate
 )
 from app.service.public.survey_service import survey_service
 
@@ -253,4 +254,129 @@ def get_survey_responses(
         session=session, 
         survey_id=survey_id,
         completed_only=completed_only
+    ) 
+
+# ----- QUESTION ENDPOINTS -----
+
+@router.post("/{survey_id}/questions", 
+    response_model=QuestionGet,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create question",
+    description="Creates a new question for a survey",
+    response_description="Newly created question")
+def create_question(
+    question_data: QuestionCreate,
+    survey_id: UUID = Path(..., description="The ID of the survey to add the question to"),
+    session: SessionDep = SessionDep
+):
+    """
+    Create a new question for a survey.
+    
+    The request body should contain all necessary information for creating the question,
+    including options if applicable.
+    
+    Parameters:
+    - **survey_id**: UUID of the survey to add the question to
+    
+    Returns the newly created question with all relationships.
+    """
+    return survey_service.create_question(
+        session=session, 
+        survey_id=survey_id,
+        question_data=question_data
+    )
+
+@router.get("/questions/{question_id}", 
+    response_model=QuestionGet,
+    summary="Get question details",
+    description="Retrieves a question by its ID, including options",
+    response_description="Question details")
+def get_question(
+    question_id: UUID = Path(..., description="The ID of the question to retrieve"),
+    session: SessionDep = SessionDep
+):
+    """
+    Get detailed information about a specific question by its ID.
+    
+    The response includes all question information including options.
+    
+    Parameters:
+    - **question_id**: UUID of the question to retrieve
+    
+    Returns the question details including options.
+    """
+    return survey_service.get_question(
+        session=session, 
+        question_id=question_id
+    )
+
+@router.get("/{survey_id}/questions", 
+    response_model=List[QuestionGet],
+    summary="Get survey questions",
+    description="Retrieves all questions for a specific survey",
+    response_description="List of questions")
+def get_survey_questions(
+    survey_id: UUID = Path(..., description="The ID of the survey to get questions for"),
+    session: SessionDep = SessionDep
+):
+    """
+    Get all questions for a specific survey.
+    
+    Parameters:
+    - **survey_id**: UUID of the survey to get questions for
+    
+    Returns a list of questions ordered by their order index.
+    """
+    return survey_service.get_survey_questions(
+        session=session, 
+        survey_id=survey_id
+    )
+
+@router.put("/questions/{question_id}", 
+    response_model=QuestionGet,
+    summary="Update question",
+    description="Updates an existing question's properties and options",
+    response_description="Updated question")
+def update_question(
+    question_data: QuestionUpdate,
+    question_id: UUID = Path(..., description="The ID of the question to update"),
+    session: SessionDep = SessionDep
+):
+    """
+    Update an existing question's properties and options.
+    
+    The request body should contain the information you want to update.
+    All fields are optional.
+    
+    Parameters:
+    - **question_id**: UUID of the question to update
+    
+    Returns the updated question with all relationships.
+    """
+    return survey_service.update_question(
+        session=session, 
+        question_id=question_id,
+        question_data=question_data
+    )
+
+@router.delete("/questions/{question_id}", 
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete question",
+    description="Deletes a question and all its options")
+def delete_question(
+    question_id: UUID = Path(..., description="The ID of the question to delete"),
+    session: SessionDep = SessionDep
+):
+    """
+    Delete a question and all its options.
+    
+    This operation cannot be undone. All options and answers associated with this
+    question will also be deleted due to cascading deletes.
+    
+    Parameters:
+    - **question_id**: UUID of the question to delete
+    """
+    survey_service.delete_question(
+        session=session, 
+        question_id=question_id
     ) 

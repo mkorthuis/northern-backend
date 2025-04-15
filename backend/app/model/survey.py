@@ -12,7 +12,6 @@ class SurveyRespondent(UUIDBaseMixin, table=True):
     username: str = Field(max_length=100, unique=True)
     
     # Relationships
-    surveys: List["Survey"] = Relationship(back_populates="created_by_user")
     responses: List["SurveyResponse"] = Relationship(back_populates="respondent")
 
 
@@ -24,10 +23,8 @@ class Survey(UUIDBaseMixin, table=True):
     survey_start: Optional[datetime] = None
     survey_end: Optional[datetime] = None
     is_active: bool = Field(default=True)
-    created_by: UUID = Field(foreign_key="survey_respondent.id")
     
     # Relationships
-    created_by_user: SurveyRespondent = Relationship(back_populates="surveys")
     sections: List["SurveySection"] = Relationship(back_populates="survey")
     questions: List["Question"] = Relationship(back_populates="survey")
     responses: List["SurveyResponse"] = Relationship(back_populates="survey")

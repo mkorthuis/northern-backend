@@ -66,7 +66,6 @@ class SurveyGet(BaseModel):
     survey_start: Optional[datetime] = None
     survey_end: Optional[datetime] = None
     is_active: bool = True
-    created_by: UUID
     sections: List[SurveySectionGet] = []
     questions: List[QuestionGet] = []
     
@@ -144,7 +143,6 @@ class SurveyCreate(BaseModel):
     survey_start: Optional[datetime] = None
     survey_end: Optional[datetime] = None
     is_active: bool = True
-    created_by: UUID
     sections: List[SurveySectionCreate] = []
     questions: List[QuestionCreate] = []
 
@@ -180,4 +178,18 @@ class SurveyResponseCreate(BaseModel):
 class SurveyResponseUpdate(BaseModel):
     completed_at: Optional[datetime] = None
     is_complete: Optional[bool] = None
-    answers: Optional[List[AnswerCreate]] = None 
+    answers: Optional[List[AnswerCreate]] = None
+
+# Question update schema
+class QuestionUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    is_required: Optional[bool] = None
+    order_index: Optional[int] = None
+    type_id: Optional[int] = None
+    section_id: Optional[UUID] = None
+    validation_rules: Optional[Dict[str, Any]] = None
+    display_logic: Optional[Dict[str, Any]] = None
+    allow_multiple: Optional[bool] = None
+    max_answers: Optional[int] = None
+    options: Optional[List[QuestionOptionCreate]] = None 

@@ -46,8 +46,7 @@ def upgrade():
             date_updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             survey_start TIMESTAMP,
             survey_end TIMESTAMP,
-            is_active BOOLEAN DEFAULT TRUE,
-            created_by UUID NOT NULL REFERENCES survey_respondent(id)
+            is_active BOOLEAN DEFAULT TRUE
         )
     """)
 

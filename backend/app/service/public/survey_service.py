@@ -10,7 +10,7 @@ from app.model.survey import (
 )
 from app.schema.survey_schema import (
     SurveyGet, SurveyResponseGet, SurveyCreate, SurveyUpdate,
-    SurveyResponseCreate, SurveyResponseUpdate
+    SurveyResponseCreate, SurveyResponseUpdate, QuestionGet, QuestionCreate, QuestionUpdate
 )
 
 class SurveyService:
@@ -129,6 +129,60 @@ class SurveyService:
         responses = session.exec(statement).all()
         return [SurveyResponseGet.from_orm(response) for response in responses]
 
+    def get_question(
+        self,
+        session: Session,
+        question_id: UUID
+    ) -> QuestionGet:
+        """
+        Get a question by ID.
+        
+        Args:
+            session: Database session
+            question_id: ID of the question to retrieve
+            
+        Returns:
+            Question details including options
+        
+        Raises:
+            HTTPException: If the question is not found
+        """
+        statement = select(Question).where(Question.id == question_id)
+        question = session.exec(statement).first()
+        
+        if not question:
+            raise HTTPException(status_code=404, detail=f"Question with ID {question_id} not found")
+            
+        return QuestionGet.from_orm(question)
+    
+    def get_survey_questions(
+        self,
+        session: Session,
+        survey_id: UUID
+    ) -> List[QuestionGet]:
+        """
+        Get all questions for a specific survey.
+        
+        Args:
+            session: Database session
+            survey_id: ID of the survey to get questions for
+            
+        Returns:
+            List of questions
+            
+        Raises:
+            HTTPException: If the survey is not found
+        """
+        # First verify the survey exists
+        survey_exists = session.exec(select(Survey).where(Survey.id == survey_id)).first()
+        if not survey_exists:
+            raise HTTPException(status_code=404, detail=f"Survey with ID {survey_id} not found")
+        
+        statement = select(Question).where(Question.survey_id == survey_id).order_by(Question.order_index)
+        questions = session.exec(statement).all()
+        
+        return [QuestionGet.from_orm(question) for question in questions]
+
     # --- CREATE OPERATIONS ---
     def create_survey(
         self,
@@ -151,8 +205,7 @@ class SurveyService:
             description=survey_data.description,
             survey_start=survey_data.survey_start,
             survey_end=survey_data.survey_end,
-            is_active=survey_data.is_active,
-            created_by=survey_data.created_by
+            is_active=survey_data.is_active
         )
         session.add(survey)
         session.flush()  # Flush to get the ID
@@ -357,6 +410,62 @@ class SurveyService:
         
         return answer
 
+    def create_question(
+        self,
+        session: Session,
+        survey_id: UUID,
+        question_data: QuestionCreate
+    ) -> QuestionGet:
+        """
+        Create a new question for a survey.
+        
+        Args:
+            session: Database session
+            survey_id: ID of the survey to add the question to
+            question_data: Data for creating the question
+            
+        Returns:
+            Newly created question
+            
+        Raises:
+            HTTPException: If the survey is not found
+        """
+        # First verify the survey exists
+        survey_exists = session.exec(select(Survey).where(Survey.id == survey_id)).first()
+        if not survey_exists:
+            raise HTTPException(status_code=404, detail=f"Survey with ID {survey_id} not found")
+        
+        # If section_id is provided, verify it exists and belongs to the survey
+        if question_data.section_id:
+            section = session.exec(
+                select(SurveySection).where(
+                    SurveySection.id == question_data.section_id,
+                    SurveySection.survey_id == survey_id
+                )
+            ).first()
+            
+            if not section:
+                raise HTTPException(
+                    status_code=404, 
+                    detail=f"Section with ID {question_data.section_id} not found in survey {survey_id}"
+                )
+        
+        # Create the question
+        question = self._create_question(
+            session=session,
+            survey_id=survey_id,
+            section_id=question_data.section_id,
+            question_data=question_data
+        )
+        
+        session.commit()
+        
+        # Refresh to get all relationships
+        statement = select(Question).where(Question.id == question.id)
+        created_question = session.exec(statement).first()
+        
+        return QuestionGet.from_orm(created_question)
+
     # --- UPDATE OPERATIONS ---
     def update_survey(
         self,
@@ -464,6 +573,95 @@ class SurveyService:
         
         return SurveyResponseGet.from_orm(updated_response)
 
+    def update_question(
+        self,
+        session: Session,
+        question_id: UUID,
+        question_data: QuestionUpdate
+    ) -> QuestionGet:
+        """
+        Update an existing question.
+        
+        Args:
+            session: Database session
+            question_id: ID of the question to update
+            question_data: Data for updating the question
+            
+        Returns:
+            Updated question
+            
+        Raises:
+            HTTPException: If the question is not found
+        """
+        # Verify question exists
+        question = session.exec(select(Question).where(Question.id == question_id)).first()
+        if not question:
+            raise HTTPException(status_code=404, detail=f"Question with ID {question_id} not found")
+        
+        # Update question attributes (only if provided)
+        if question_data.title is not None:
+            question.title = question_data.title
+        if question_data.description is not None:
+            question.description = question_data.description
+        if question_data.is_required is not None:
+            question.is_required = question_data.is_required
+        if question_data.order_index is not None:
+            question.order_index = question_data.order_index
+        if question_data.type_id is not None:
+            question.type_id = question_data.type_id
+        if question_data.validation_rules is not None:
+            question.validation_rules = question_data.validation_rules
+        if question_data.display_logic is not None:
+            question.display_logic = question_data.display_logic
+        if question_data.allow_multiple is not None:
+            question.allow_multiple = question_data.allow_multiple
+        if question_data.max_answers is not None:
+            question.max_answers = question_data.max_answers
+        
+        # If section_id is provided, verify it exists and belongs to the survey
+        if question_data.section_id is not None:
+            if question_data.section_id:  # Not None and not empty UUID
+                section = session.exec(
+                    select(SurveySection).where(
+                        SurveySection.id == question_data.section_id,
+                        SurveySection.survey_id == question.survey_id
+                    )
+                ).first()
+                
+                if not section:
+                    raise HTTPException(
+                        status_code=404, 
+                        detail=f"Section with ID {question_data.section_id} not found in survey {question.survey_id}"
+                    )
+                
+            question.section_id = question_data.section_id
+        
+        # Update options if provided
+        if question_data.options is not None:
+            # Delete existing options
+            session.exec(delete(QuestionOption).where(QuestionOption.question_id == question_id))
+            
+            # Create new options
+            for option_data in question_data.options:
+                option = QuestionOption(
+                    question_id=question.id,
+                    text=option_data.text,
+                    order_index=option_data.order_index,
+                    is_other_option=option_data.is_other_option,
+                    score=option_data.score,
+                    row_label=option_data.row_label,
+                    column_label=option_data.column_label
+                )
+                session.add(option)
+        
+        session.add(question)
+        session.commit()
+        
+        # Refresh to get updated relationships
+        session.refresh(question)
+        
+        return QuestionGet.from_orm(question)
+
     # --- DELETE OPERATIONS ---
     def delete_survey(
         self,
@@ -487,7 +685,26 @@ class SurveyService:
         if not survey:
             raise HTTPException(status_code=404, detail=f"Survey with ID {survey_id} not found")
         
-        # Delete the survey (cascades to sections, questions, etc. due to DB constraints)
+        # First, get all questions for this survey
+        questions = session.exec(select(Question).where(Question.survey_id == survey_id)).all()
+        
+        # For each question, first delete its options
+        for question in questions:
+            # Delete the question's options first
+            options = session.exec(select(QuestionOption).where(QuestionOption.question_id == question.id)).all()
+            for option in options:
+                session.delete(option)
+            
+            # Flush to ensure options are deleted
+            session.flush()
+            
+            # Now delete the question
+            session.delete(question)
+        
+        # Flush to ensure questions are deleted
+        session.flush()
+        
+        # Now delete the survey (will cascade to sections and responses)
         session.delete(survey)
         session.commit()
         
@@ -517,6 +734,42 @@ class SurveyService:
         
         # Delete the response (cascades to answers, etc. due to DB constraints)
         session.delete(response)
+        session.commit()
+        
+        return True
+
+    def delete_question(
+        self,
+        session: Session,
+        question_id: UUID
+    ) -> bool:
+        """
+        Delete a question.
+        
+        Args:
+            session: Database session
+            question_id: ID of the question to delete
+            
+        Returns:
+            True if deletion was successful
+            
+        Raises:
+            HTTPException: If the question is not found
+        """
+        question = session.exec(select(Question).where(Question.id == question_id)).first()
+        if not question:
+            raise HTTPException(status_code=404, detail=f"Question with ID {question_id} not found")
+        
+        # First delete all options for this question
+        options = session.exec(select(QuestionOption).where(QuestionOption.question_id == question_id)).all()
+        for option in options:
+            session.delete(option)
+        
+        # Flush to ensure options are deleted
+        session.flush()
+        
+        # Now delete the question
+        session.delete(question)
         session.commit()
         
         return True

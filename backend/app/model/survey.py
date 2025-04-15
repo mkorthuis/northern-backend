@@ -65,6 +65,7 @@ class Question(UUIDBaseMixin, table=True):
     description: Optional[str] = None
     is_required: bool = Field(default=False)
     order_index: int
+    external_question_id: Optional[str] = Field(default=None, max_length=255)
     validation_rules: Optional[Dict[str, Any]] = Field(default=None, sa_type=JSON)
     display_logic: Optional[Dict[str, Any]] = Field(default=None, sa_type=JSON)
     allow_multiple: bool = Field(default=False)

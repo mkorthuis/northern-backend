@@ -102,6 +102,7 @@ def upgrade():
             description TEXT,
             is_required BOOLEAN DEFAULT FALSE,
             order_index INTEGER NOT NULL,
+            external_question_id VARCHAR(255),
             validation_rules JSONB,
             display_logic JSONB,
             allow_multiple BOOLEAN DEFAULT FALSE,

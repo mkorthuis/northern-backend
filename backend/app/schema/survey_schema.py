@@ -29,6 +29,7 @@ class QuestionGet(BaseModel):
     description: Optional[str] = None
     is_required: bool = False
     order_index: int
+    external_question_id: Optional[str] = None
     validation_rules: Optional[Dict[str, Any]] = None
     display_logic: Optional[Dict[str, Any]] = None
     allow_multiple: bool = False
@@ -125,6 +126,7 @@ class QuestionCreate(BaseModel):
     order_index: int
     type_id: int
     section_id: Optional[UUID] = None
+    external_question_id: Optional[str] = None
     validation_rules: Optional[Dict[str, Any]] = None
     display_logic: Optional[Dict[str, Any]] = None
     allow_multiple: bool = False
@@ -180,6 +182,13 @@ class SurveyResponseUpdate(BaseModel):
     is_complete: Optional[bool] = None
     answers: Optional[List[AnswerCreate]] = None
 
+# Bulk response upload schemas
+class BulkSurveyResponseCreate(BaseModel):
+    """Schema for uploading multiple survey responses at once"""
+    survey_id: UUID
+    responses: List[SurveyResponseCreate]
+    batch_metadata: Optional[Dict[str, Any]] = None
+
 # Question update schema
 class QuestionUpdate(BaseModel):
     title: Optional[str] = None
@@ -188,6 +197,7 @@ class QuestionUpdate(BaseModel):
     order_index: Optional[int] = None
     type_id: Optional[int] = None
     section_id: Optional[UUID] = None
+    external_question_id: Optional[str] = None
     validation_rules: Optional[Dict[str, Any]] = None
     display_logic: Optional[Dict[str, Any]] = None
     allow_multiple: Optional[bool] = None

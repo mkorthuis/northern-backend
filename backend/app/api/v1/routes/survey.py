@@ -6,7 +6,8 @@ from app.api.v1.deps import SessionDep
 from app.schema.survey_schema import (
     SurveyGet, SurveyResponseGet, SurveyCreate, SurveyUpdate,
     SurveyResponseCreate, SurveyResponseUpdate,
-    QuestionGet, QuestionCreate, QuestionUpdate
+    QuestionGet, QuestionCreate, QuestionUpdate,
+    BulkSurveyResponseCreate
 )
 from app.service.public.survey_service import survey_service
 
@@ -254,7 +255,35 @@ def get_survey_responses(
         session=session, 
         survey_id=survey_id,
         completed_only=completed_only
-    ) 
+    )
+
+@router.post("/response/bulk", 
+    response_model=List[SurveyResponseGet],
+    status_code=status.HTTP_201_CREATED,
+    summary="Bulk create survey responses",
+    description="Creates multiple responses to a survey in a single request",
+    response_description="List of newly created survey responses")
+def create_bulk_survey_responses(
+    bulk_data: BulkSurveyResponseCreate,
+    session: SessionDep = SessionDep
+):
+    """
+    Create multiple responses to a survey in a single request.
+    
+    This endpoint allows for efficiently uploading multiple survey responses at once.
+    All responses must be for the same survey (specified by survey_id).
+    
+    The request body should contain:
+    - survey_id: The ID of the survey these responses are for
+    - responses: A list of response objects with their answers
+    - batch_metadata: Optional metadata for the entire batch
+    
+    Returns a list of the newly created survey responses.
+    """
+    return survey_service.create_bulk_survey_responses(
+        session=session, 
+        bulk_data=bulk_data
+    )
 
 # ----- QUESTION ENDPOINTS -----
 

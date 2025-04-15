@@ -277,6 +277,7 @@ class SurveyService:
             description=question_data.description,
             is_required=question_data.is_required,
             order_index=question_data.order_index,
+            external_question_id=question_data.external_question_id,
             validation_rules=question_data.validation_rules,
             display_logic=question_data.display_logic,
             allow_multiple=question_data.allow_multiple,
@@ -609,6 +610,8 @@ class SurveyService:
             question.order_index = question_data.order_index
         if question_data.type_id is not None:
             question.type_id = question_data.type_id
+        if question_data.external_question_id is not None:
+            question.external_question_id = question_data.external_question_id
         if question_data.validation_rules is not None:
             question.validation_rules = question_data.validation_rules
         if question_data.display_logic is not None:
@@ -773,5 +776,71 @@ class SurveyService:
         session.commit()
         
         return True
+
+    # --- BULK OPERATIONS ---
+    def create_bulk_survey_responses(
+        self,
+        session: Session,
+        bulk_data: Any
+    ) -> List[SurveyResponseGet]:
+        """
+        Create multiple survey responses in a single transaction.
+        
+        Args:
+            session: Database session
+            bulk_data: Data containing survey_id and list of responses to create
+            
+        Returns:
+            List of newly created survey responses
+            
+        Raises:
+            HTTPException: If the survey is not found or validation fails
+        """
+        # Verify survey exists
+        survey = session.exec(select(Survey).where(Survey.id == bulk_data.survey_id)).first()
+        if not survey:
+            raise HTTPException(status_code=404, detail=f"Survey with ID {bulk_data.survey_id} not found")
+        
+        # Collect the created responses
+        created_responses = []
+        
+        # Process each response in the bulk upload
+        for response_data in bulk_data.responses:
+            # Ensure the survey_id is consistent
+            if response_data.survey_id != bulk_data.survey_id:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Survey ID mismatch. Expected {bulk_data.survey_id}, got {response_data.survey_id}"
+                )
+            
+            # Create response
+            response = SurveyResponse(
+                survey_id=response_data.survey_id,
+                respondent_id=response_data.respondent_id,
+                ip_address=response_data.ip_address,
+                user_agent=response_data.user_agent,
+                response_metadata=response_data.response_metadata,
+                is_complete=False  # Always start as incomplete
+            )
+            session.add(response)
+            session.flush()  # Flush to get the ID
+            
+            # Create answers if provided
+            if response_data.answers:
+                for answer_data in response_data.answers:
+                    self._create_answer(
+                        session=session, 
+                        response_id=response.id,
+                        answer_data=answer_data
+                    )
+            
+            # Add to our collection
+            created_responses.append(response)
+        
+        # Commit all changes at once
+        session.commit()
+        
+        # Return formatted response objects
+        return [SurveyResponseGet.from_orm(response) for response in created_responses]
 
 survey_service = SurveyService() 

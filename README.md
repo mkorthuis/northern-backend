@@ -1,4 +1,4 @@
-# NH Facts AI  
+# Northern Intelligence
 
 Inspired by: https://fastapi.tiangolo.com/project-generation/
 

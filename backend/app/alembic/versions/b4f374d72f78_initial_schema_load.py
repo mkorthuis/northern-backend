@@ -175,6 +175,93 @@ def upgrade():
         )
     """)
 
+    # Create Chart Type table
+    op.execute("""
+        CREATE TABLE chart_type (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(50) NOT NULL UNIQUE,
+            date_created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            date_updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Insert chart types
+    op.execute("""
+        INSERT INTO chart_type (name) VALUES
+        ('bar'),
+        ('pie'),
+        ('horizontalBar')
+    """)
+
+    # Create Survey Analysis table
+    op.execute("""
+        CREATE TABLE survey_analysis (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            survey_id UUID NOT NULL REFERENCES survey(id) ON DELETE CASCADE,
+            title VARCHAR(255) NOT NULL,
+            description TEXT,
+            date_created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            date_updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Create Survey Analysis Question table
+    op.execute("""
+        CREATE TABLE survey_analysis_question (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            survey_analysis_id UUID NOT NULL REFERENCES survey_analysis(id) ON DELETE CASCADE,
+            question_id UUID NOT NULL REFERENCES question(id) ON DELETE CASCADE,
+            chart_type_id INTEGER NOT NULL REFERENCES chart_type(id),
+            sort_by_value BOOLEAN DEFAULT FALSE,
+            date_created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            date_updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Create Survey Question Topic table
+    op.execute("""
+        CREATE TABLE survey_question_topic (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            survey_id UUID NOT NULL REFERENCES survey(id) ON DELETE CASCADE,
+            name VARCHAR(255) NOT NULL,
+            date_created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            date_updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Create Survey Analysis Question Topic Cross-reference table
+    op.execute("""
+        CREATE TABLE survey_analysis_question_topic_xref (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            survey_question_topic_id UUID NOT NULL REFERENCES survey_question_topic(id) ON DELETE CASCADE,
+            survey_analysis_question_id UUID NOT NULL REFERENCES survey_analysis_question(id) ON DELETE CASCADE,
+            date_created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            date_updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Create Survey Report Segment table
+    op.execute("""
+        CREATE TABLE survey_report_segment (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            survey_id UUID NOT NULL REFERENCES survey(id) ON DELETE CASCADE,
+            name VARCHAR(255) NOT NULL,
+            date_created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            date_updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Create Survey Analysis Report Segment Cross-reference table
+    op.execute("""
+        CREATE TABLE survey_analysis_report_segment_xref (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            survey_report_segment_id UUID NOT NULL REFERENCES survey_report_segment(id) ON DELETE CASCADE,
+            survey_analysis_question_id UUID NOT NULL REFERENCES survey_analysis_question(id) ON DELETE CASCADE,
+            date_created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            date_updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     # Create indexes for better performance
     indexes = [
         "CREATE INDEX idx_questions_survey_id ON question(survey_id)",
@@ -183,7 +270,12 @@ def upgrade():
         "CREATE INDEX idx_answers_response_id ON answer(response_id)",
         "CREATE INDEX idx_answers_question_id ON answer(question_id)",
         "CREATE INDEX idx_answer_items_answer_id ON answer_item(answer_id)",
-        "CREATE INDEX idx_survey_sections_survey_id ON survey_section(survey_id)"
+        "CREATE INDEX idx_survey_sections_survey_id ON survey_section(survey_id)",
+        "CREATE INDEX idx_survey_analysis_survey_id ON survey_analysis(survey_id)",
+        "CREATE INDEX idx_survey_analysis_question_analysis_id ON survey_analysis_question(survey_analysis_id)",
+        "CREATE INDEX idx_survey_analysis_question_question_id ON survey_analysis_question(question_id)",
+        "CREATE INDEX idx_survey_question_topic_survey_id ON survey_question_topic(survey_id)",
+        "CREATE INDEX idx_survey_report_segment_survey_id ON survey_report_segment(survey_id)"
     ]
 
     for index in indexes:
@@ -210,7 +302,14 @@ def upgrade():
         "CREATE TRIGGER update_question_option_modtime BEFORE UPDATE ON question_option FOR EACH ROW EXECUTE PROCEDURE update_modified_column()",
         "CREATE TRIGGER update_survey_response_modtime BEFORE UPDATE ON survey_response FOR EACH ROW EXECUTE PROCEDURE update_modified_column()",
         "CREATE TRIGGER update_answer_modtime BEFORE UPDATE ON answer FOR EACH ROW EXECUTE PROCEDURE update_modified_column()",
-        "CREATE TRIGGER update_answer_item_modtime BEFORE UPDATE ON answer_item FOR EACH ROW EXECUTE PROCEDURE update_modified_column()"
+        "CREATE TRIGGER update_answer_item_modtime BEFORE UPDATE ON answer_item FOR EACH ROW EXECUTE PROCEDURE update_modified_column()",
+        "CREATE TRIGGER update_chart_type_modtime BEFORE UPDATE ON chart_type FOR EACH ROW EXECUTE PROCEDURE update_modified_column()",
+        "CREATE TRIGGER update_survey_analysis_modtime BEFORE UPDATE ON survey_analysis FOR EACH ROW EXECUTE PROCEDURE update_modified_column()",
+        "CREATE TRIGGER update_survey_analysis_question_modtime BEFORE UPDATE ON survey_analysis_question FOR EACH ROW EXECUTE PROCEDURE update_modified_column()",
+        "CREATE TRIGGER update_survey_question_topic_modtime BEFORE UPDATE ON survey_question_topic FOR EACH ROW EXECUTE PROCEDURE update_modified_column()",
+        "CREATE TRIGGER update_survey_analysis_question_topic_xref_modtime BEFORE UPDATE ON survey_analysis_question_topic_xref FOR EACH ROW EXECUTE PROCEDURE update_modified_column()",
+        "CREATE TRIGGER update_survey_report_segment_modtime BEFORE UPDATE ON survey_report_segment FOR EACH ROW EXECUTE PROCEDURE update_modified_column()",
+        "CREATE TRIGGER update_survey_analysis_report_segment_xref_modtime BEFORE UPDATE ON survey_analysis_report_segment_xref FOR EACH ROW EXECUTE PROCEDURE update_modified_column()"
     ]
 
     for trigger in triggers:
@@ -281,6 +380,13 @@ def downgrade():
     
     # Drop tables in reverse order to handle dependencies
     tables_to_drop = [
+        'survey_analysis_report_segment_xref',
+        'survey_report_segment',
+        'survey_analysis_question_topic_xref',
+        'survey_question_topic',
+        'survey_analysis_question',
+        'survey_analysis',
+        'chart_type',
         'answer_item',
         'answer',
         'survey_response',

@@ -27,6 +27,11 @@ class Survey(UUIDBaseMixin, table=True):
     sections: List["SurveySection"] = Relationship(back_populates="survey")
     questions: List["Question"] = Relationship(back_populates="survey")
     responses: List["SurveyResponse"] = Relationship(back_populates="survey")
+    
+    # Relationships to analysis models (now imported from survey_analysis.py)
+    analyses: List["SurveyAnalysis"] = Relationship(back_populates="survey")
+    topics: List["SurveyQuestionTopic"] = Relationship(back_populates="survey")
+    report_segments: List["SurveyReportSegment"] = Relationship(back_populates="survey")
 
 
 class SurveySection(UUIDBaseMixin, table=True):
@@ -77,6 +82,9 @@ class Question(UUIDBaseMixin, table=True):
     type: QuestionType = Relationship(back_populates="questions")
     options: List["QuestionOption"] = Relationship(back_populates="question")
     answers: List["Answer"] = Relationship(back_populates="question")
+    
+    # Relationships to analysis models (now imported from survey_analysis.py)
+    analysis_questions: List["SurveyAnalysisQuestion"] = Relationship(back_populates="question")
 
 
 class QuestionOption(UUIDBaseMixin, table=True):
@@ -141,4 +149,12 @@ class AnswerItem(UUIDBaseMixin, table=True):
     
     # Relationships
     answer: Answer = Relationship(back_populates="items")
-    option: Optional[QuestionOption] = Relationship(back_populates="answer_items") 
+    option: Optional[QuestionOption] = Relationship(back_populates="answer_items")
+
+# Forward references to models now in survey_analysis.py
+from .survey_analysis import (
+    SurveyAnalysis, 
+    SurveyAnalysisQuestion, 
+    SurveyQuestionTopic, 
+    SurveyReportSegment
+) 

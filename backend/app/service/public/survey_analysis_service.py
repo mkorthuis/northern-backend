@@ -212,7 +212,44 @@ class SurveyAnalysisService:
         if not analysis:
             raise HTTPException(status_code=404, detail=f"Survey analysis with ID {analysis_id} not found")
         
-        # This will cascade to delete all analysis questions and xrefs due to DB constraints
+        # Get all SurveyAnalysisQuestion records associated with this analysis
+        analysis_questions = session.exec(
+            select(SurveyAnalysisQuestion).where(SurveyAnalysisQuestion.survey_analysis_id == analysis_id)
+        ).all()
+        
+        # For each analysis question, first delete all cross-reference records
+        for question in analysis_questions:
+            # Delete topic cross-references
+            topic_xrefs = session.exec(
+                select(SurveyAnalysisQuestionTopicXref).where(
+                    SurveyAnalysisQuestionTopicXref.survey_analysis_question_id == question.id
+                )
+            ).all()
+            
+            for topic_xref in topic_xrefs:
+                session.delete(topic_xref)
+            
+            # Delete segment cross-references
+            segment_xrefs = session.exec(
+                select(SurveyAnalysisReportSegmentXref).where(
+                    SurveyAnalysisReportSegmentXref.survey_analysis_question_id == question.id
+                )
+            ).all()
+            
+            for segment_xref in segment_xrefs:
+                session.delete(segment_xref)
+        
+        # Flush to ensure cross-references are deleted
+        session.flush()
+        
+        # Now delete the analysis questions
+        for question in analysis_questions:
+            session.delete(question)
+        
+        # Flush to ensure questions are deleted before deleting the analysis itself
+        session.flush()
+        
+        # Now delete the analysis
         session.delete(analysis)
         session.commit()
         

@@ -34,7 +34,7 @@ def upgrade():
         # This is a basic implementation - for more complex SQL you might need a proper SQL parser
         statements = sql_content.split(';')
         
-        op.execute("SET session_replication_role = 'replica';")
+        op.execute("SET CONSTRAINTS ALL DEFERRED;")
         for statement in statements:
             statement = statement.strip()
             if statement:  # Skip empty statements
@@ -46,9 +46,6 @@ def upgrade():
     except Exception as e:
         print(f"Error executing SQL: {e}")
         raise
-    finally:
-        # Re-enable foreign key constraint checks
-        op.execute("SET session_replication_role = 'origin';")
 def downgrade():
     # Since this is a data loading migration, the downgrade path
     # should be handled carefully based on your specific needs.

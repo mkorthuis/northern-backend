@@ -194,7 +194,7 @@ class BulkSurveyResponseCreate(BaseModel):
 class PaginationParams(BaseModel):
     """Common pagination parameters"""
     page: int = Field(1, description="Page number (1-indexed)", ge=1)
-    page_size: int = Field(50, description="Number of items per page", ge=1, le=100)
+    page_size: int = Field(50, description="Number of items per page", ge=1, le=100000)
 
 class SurveyResponseFilter(BaseModel):
     """Filter parameters for survey responses"""

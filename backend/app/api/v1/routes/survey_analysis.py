@@ -9,7 +9,8 @@ from app.schema.survey_analysis_schema import (
     SurveyAnalysisGet, SurveyAnalysisCreate, SurveyAnalysisUpdate,
     SurveyAnalysisQuestionGet, SurveyAnalysisQuestionCreate, SurveyAnalysisQuestionUpdate,
     SurveyQuestionTopicGet, SurveyQuestionTopicCreate, SurveyQuestionTopicUpdate,
-    SurveyReportSegmentGet, SurveyReportSegmentCreate, SurveyReportSegmentUpdate
+    SurveyReportSegmentGet, SurveyReportSegmentCreate, SurveyReportSegmentUpdate,
+    SurveyAnalysisFilterGet, SurveyAnalysisFilterCreate, SurveyAnalysisFilterUpdate
 )
 from app.service.public.survey_analysis_service import survey_analysis_service
 
@@ -518,4 +519,118 @@ def delete_survey_report_segment(
     survey_analysis_service.delete_survey_report_segment(
         session=session, 
         segment_id=segment_id
+    )
+
+# ----- SURVEY ANALYSIS FILTER ENDPOINTS -----
+
+@router.get("/analyses/{analysis_id}/filters", 
+    response_model=List[SurveyAnalysisFilterGet],
+    summary="Get analysis filters",
+    description="Retrieves all filters for a specific survey analysis",
+    response_description="List of analysis filters")
+def get_survey_analysis_filters(
+    analysis_id: UUID = Path(..., description="The ID of the analysis to get filters for"),
+    session: SessionDep = SessionDep
+):
+    """
+    Get all filters for a specific survey analysis.
+    
+    Parameters:
+    - **analysis_id**: UUID of the analysis to get filters for
+    
+    Returns a list of analysis filters.
+    """
+    return survey_analysis_service.get_survey_analysis_filters(
+        session=session, 
+        analysis_id=analysis_id
+    )
+
+@router.get("/filters/{filter_id}", 
+    response_model=SurveyAnalysisFilterGet,
+    summary="Get analysis filter",
+    description="Retrieves a specific survey analysis filter by ID",
+    response_description="Analysis filter details")
+def get_survey_analysis_filter(
+    filter_id: UUID = Path(..., description="The ID of the filter to retrieve"),
+    session: SessionDep = SessionDep
+):
+    """
+    Get detailed information about a specific survey analysis filter by its ID.
+    
+    Parameters:
+    - **filter_id**: UUID of the filter to retrieve
+    
+    Returns the survey analysis filter details.
+    """
+    return survey_analysis_service.get_survey_analysis_filter(
+        session=session, 
+        filter_id=filter_id
+    )
+
+@router.post("/filters", 
+    response_model=SurveyAnalysisFilterGet,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create analysis filter",
+    description="Creates a new survey analysis filter",
+    response_description="Newly created analysis filter")
+def create_survey_analysis_filter(
+    filter_data: SurveyAnalysisFilterCreate,
+    session: SessionDep = SessionDep
+):
+    """
+    Create a new survey analysis filter.
+    
+    The request body should contain the survey analysis ID, question ID, and criteria.
+    
+    Returns the newly created survey analysis filter.
+    """
+    return survey_analysis_service.create_survey_analysis_filter(
+        session=session, 
+        filter_data=filter_data
+    )
+
+@router.put("/filters/{filter_id}", 
+    response_model=SurveyAnalysisFilterGet,
+    summary="Update analysis filter",
+    description="Updates an existing survey analysis filter",
+    response_description="Updated analysis filter")
+def update_survey_analysis_filter(
+    filter_data: SurveyAnalysisFilterUpdate,
+    filter_id: UUID = Path(..., description="The ID of the filter to update"),
+    session: SessionDep = SessionDep
+):
+    """
+    Update an existing survey analysis filter.
+    
+    Parameters:
+    - **filter_id**: UUID of the filter to update
+    
+    Returns the updated survey analysis filter.
+    """
+    return survey_analysis_service.update_survey_analysis_filter(
+        session=session, 
+        filter_id=filter_id,
+        filter_data=filter_data
+    )
+
+@router.delete("/filters/{filter_id}", 
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete analysis filter",
+    description="Deletes a survey analysis filter and all its criteria")
+def delete_survey_analysis_filter(
+    filter_id: UUID = Path(..., description="The ID of the filter to delete"),
+    session: SessionDep = SessionDep
+):
+    """
+    Delete a survey analysis filter and all its criteria.
+    
+    This operation cannot be undone. All filter criteria will also be deleted 
+    due to cascading deletes.
+    
+    Parameters:
+    - **filter_id**: UUID of the filter to delete
+    """
+    survey_analysis_service.delete_survey_analysis_filter(
+        session=session, 
+        filter_id=filter_id
     ) 

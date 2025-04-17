@@ -10,7 +10,9 @@ from app.model.survey import (
     Question, QuestionOption, AnswerItem
 )
 from app.model.survey_analysis import (
-    SurveyAnalysisQuestion, SurveyAnalysisQuestionTopicXref, SurveyAnalysisReportSegmentXref
+    SurveyAnalysis, SurveyAnalysisQuestion, 
+    SurveyAnalysisQuestionTopicXref, SurveyAnalysisReportSegmentXref,
+    SurveyQuestionTopic, SurveyReportSegment
 )
 from app.schema.survey_schema import (
     SurveyGet, SurveyResponseGet, SurveyCreate, SurveyUpdate,
@@ -743,8 +745,106 @@ class SurveyService:
         
         # First, get all questions for this survey
         questions = session.exec(select(Question).where(Question.survey_id == survey_id)).all()
+        question_ids = [q.id for q in questions]
         
-        # For each question, first delete its options
+        # Get all survey analyses for this survey
+        analyses = session.exec(select(SurveyAnalysis).where(SurveyAnalysis.survey_id == survey_id)).all()
+        
+        # For each analysis, delete its questions and cross-references
+        for analysis in analyses:
+            # Get analysis questions for this analysis
+            analysis_questions = session.exec(
+                select(SurveyAnalysisQuestion).where(
+                    SurveyAnalysisQuestion.survey_analysis_id == analysis.id
+                )
+            ).all()
+            
+            # For each analysis question, delete cross-references
+            for analysis_question in analysis_questions:
+                # Delete topic cross-references
+                topic_xrefs = session.exec(
+                    select(SurveyAnalysisQuestionTopicXref).where(
+                        SurveyAnalysisQuestionTopicXref.survey_analysis_question_id == analysis_question.id
+                    )
+                ).all()
+                for topic_xref in topic_xrefs:
+                    session.delete(topic_xref)
+                
+                # Delete segment cross-references
+                segment_xrefs = session.exec(
+                    select(SurveyAnalysisReportSegmentXref).where(
+                        SurveyAnalysisReportSegmentXref.survey_analysis_question_id == analysis_question.id
+                    )
+                ).all()
+                for segment_xref in segment_xrefs:
+                    session.delete(segment_xref)
+            
+            # Flush to ensure cross-references are deleted
+            session.flush()
+            
+            # Delete analysis questions
+            for analysis_question in analysis_questions:
+                session.delete(analysis_question)
+            
+            # Flush to ensure analysis questions are deleted
+            session.flush()
+            
+            # Delete the analysis itself
+            session.delete(analysis)
+            
+        # Flush to ensure analyses are deleted
+        session.flush()
+        
+        # Delete any remaining analysis questions that reference these questions
+        analysis_questions = session.exec(
+            select(SurveyAnalysisQuestion).where(
+                SurveyAnalysisQuestion.question_id.in_(question_ids)
+            )
+        ).all()
+        
+        # For each analysis question, first delete all cross-reference records
+        for analysis_question in analysis_questions:
+            # Delete topic cross-references
+            topic_xrefs = session.exec(
+                select(SurveyAnalysisQuestionTopicXref).where(
+                    SurveyAnalysisQuestionTopicXref.survey_analysis_question_id == analysis_question.id
+                )
+            ).all()
+            for topic_xref in topic_xrefs:
+                session.delete(topic_xref)
+            
+            # Delete segment cross-references
+            segment_xrefs = session.exec(
+                select(SurveyAnalysisReportSegmentXref).where(
+                    SurveyAnalysisReportSegmentXref.survey_analysis_question_id == analysis_question.id
+                )
+            ).all()
+            for segment_xref in segment_xrefs:
+                session.delete(segment_xref)
+        
+        # Flush to ensure cross-references are deleted
+        session.flush()
+        
+        # Now delete the analysis questions
+        for analysis_question in analysis_questions:
+            session.delete(analysis_question)
+        
+        # Flush to ensure analysis questions are deleted
+        session.flush()
+        
+        # Delete topics and report segments for this survey
+        topics = session.exec(select(SurveyQuestionTopic).where(SurveyQuestionTopic.survey_id == survey_id)).all()
+        for topic in topics:
+            session.delete(topic)
+            
+        segments = session.exec(select(SurveyReportSegment).where(SurveyReportSegment.survey_id == survey_id)).all()
+        for segment in segments:
+            session.delete(segment)
+            
+        # Flush to ensure topics and segments are deleted
+        session.flush()
+        
+        # For each question, delete its options
         for question in questions:
             # Delete the question's options first
             options = session.exec(select(QuestionOption).where(QuestionOption.question_id == question.id)).all()

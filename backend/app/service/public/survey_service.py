@@ -9,6 +9,9 @@ from app.model.survey import (
     Survey, SurveyResponse, Answer, SurveySection, 
     Question, QuestionOption, AnswerItem
 )
+from app.model.survey_analysis import (
+    SurveyAnalysisQuestion, SurveyAnalysisQuestionTopicXref, SurveyAnalysisReportSegmentXref
+)
 from app.schema.survey_schema import (
     SurveyGet, SurveyResponseGet, SurveyCreate, SurveyUpdate,
     SurveyResponseCreate, SurveyResponseUpdate, QuestionGet, QuestionCreate, QuestionUpdate
@@ -813,7 +816,44 @@ class SurveyService:
         if not question:
             raise HTTPException(status_code=404, detail=f"Question with ID {question_id} not found")
         
-        # First delete all options for this question
+        # First delete any survey analysis questions that reference this question
+        analysis_questions = session.exec(
+            select(SurveyAnalysisQuestion).where(SurveyAnalysisQuestion.question_id == question_id)
+        ).all()
+        
+        # For each analysis question, first delete all cross-reference records
+        for analysis_question in analysis_questions:
+            # Delete topic cross-references
+            topic_xrefs = session.exec(
+                select(SurveyAnalysisQuestionTopicXref).where(
+                    SurveyAnalysisQuestionTopicXref.survey_analysis_question_id == analysis_question.id
+                )
+            ).all()
+            
+            for topic_xref in topic_xrefs:
+                session.delete(topic_xref)
+            
+            # Delete segment cross-references
+            segment_xrefs = session.exec(
+                select(SurveyAnalysisReportSegmentXref).where(
+                    SurveyAnalysisReportSegmentXref.survey_analysis_question_id == analysis_question.id
+                )
+            ).all()
+            
+            for segment_xref in segment_xrefs:
+                session.delete(segment_xref)
+        
+        # Flush to ensure cross-references are deleted
+        session.flush()
+        
+        # Now delete the analysis questions
+        for analysis_question in analysis_questions:
+            session.delete(analysis_question)
+        
+        # Flush to ensure analysis questions are deleted
+        session.flush()
+        
+        # Now delete all options for this question
         options = session.exec(select(QuestionOption).where(QuestionOption.question_id == question_id)).all()
         for option in options:
             session.delete(option)
@@ -870,7 +910,8 @@ class SurveyService:
                 ip_address=response_data.ip_address,
                 user_agent=response_data.user_agent,
                 response_metadata=response_data.response_metadata,
-                is_complete=False  # Always start as incomplete
+                is_complete=response_data.is_complete,
+                completed_at=response_data.completed_at
             )
             session.add(response)
             session.flush()  # Flush to get the ID

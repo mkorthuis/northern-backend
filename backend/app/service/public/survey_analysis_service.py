@@ -440,11 +440,24 @@ class SurveyAnalysisService:
         Raises:
             HTTPException: If the analysis question, chart type, topic, or segment is not found
         """
-        # Get the analysis question
-        analysis_question = session.exec(
-            select(SurveyAnalysisQuestion).where(SurveyAnalysisQuestion.id == analysis_question_id)
-        ).first()
+        def load_analysis_question():
+            """Load analysis question with all necessary relationships."""
+            statement = (
+                select(SurveyAnalysisQuestion)
+                .where(SurveyAnalysisQuestion.id == analysis_question_id)
+                .options(
+                    sqlalchemy.orm.joinedload(SurveyAnalysisQuestion.chart_type),
+                    sqlalchemy.orm.joinedload(SurveyAnalysisQuestion.question),
+                    sqlalchemy.orm.joinedload(SurveyAnalysisQuestion.topic_xrefs)
+                    .joinedload(SurveyAnalysisQuestionTopicXref.survey_question_topic),
+                    sqlalchemy.orm.joinedload(SurveyAnalysisQuestion.segment_xrefs)
+                    .joinedload(SurveyAnalysisReportSegmentXref.survey_report_segment)
+                )
+            )
+            return session.exec(statement).first()
         
+        # Load the analysis question
+        analysis_question = load_analysis_question()
         if not analysis_question:
             raise HTTPException(
                 status_code=404, 
@@ -456,89 +469,89 @@ class SurveyAnalysisService:
             select(SurveyAnalysis).where(SurveyAnalysis.id == analysis_question.survey_analysis_id)
         ).first()
         
-        # Update chart type if provided
+        # Update basic fields
         if question_data.chart_type_id is not None:
-            # Verify chart type exists
             chart_type = session.exec(select(ChartType).where(ChartType.id == question_data.chart_type_id)).first()
             if not chart_type:
                 raise HTTPException(
                     status_code=404, 
                     detail=f"Chart type with ID {question_data.chart_type_id} not found"
                 )
-            
             analysis_question.chart_type_id = question_data.chart_type_id
         
-        # Update sort_by_value if provided
         if question_data.sort_by_value is not None:
             analysis_question.sort_by_value = question_data.sort_by_value
         
-        # Update topic associations if provided
-        if question_data.topic_ids is not None:
-            # Remove existing topic associations
+        # Update relationships
+        def update_xref_relationships(
+            xref_type: type,
+            entity_type: type,
+            xref_field: str,
+            id_list: Optional[List[UUID]],
+            entity_id_field: str
+        ):
+            """Generic function to update cross-reference relationships."""
+            # Delete existing xrefs
             session.exec(
-                delete(SurveyAnalysisQuestionTopicXref).where(
-                    SurveyAnalysisQuestionTopicXref.survey_analysis_question_id == analysis_question_id
+                delete(xref_type).where(
+                    getattr(xref_type, "survey_analysis_question_id") == analysis_question_id
                 )
             )
-            
-            # Add new topic associations
-            for topic_id in question_data.topic_ids:
-                # Verify topic exists and belongs to the same survey
-                topic = session.exec(
-                    select(SurveyQuestionTopic).where(
-                        SurveyQuestionTopic.id == topic_id,
-                        SurveyQuestionTopic.survey_id == analysis.survey_id
+            session.commit()
+
+            # Clear relationship list
+            setattr(analysis_question, xref_field, [])
+
+            # Add new relationships if provided
+            if id_list is not None:
+                for entity_id in id_list:
+                    # Verify entity exists and belongs to the same survey
+                    entity = session.exec(
+                        select(entity_type).where(
+                            getattr(entity_type, "id") == entity_id,
+                            entity_type.survey_id == analysis.survey_id
+                        )
+                    ).first()
+
+                    if not entity:
+                        raise HTTPException(
+                            status_code=404,
+                            detail=f"{entity_type.__name__} with ID {entity_id} not found or not part of the same survey"
+                        )
+
+                    # Create and add new xref
+                    xref = xref_type(
+                        **{
+                            entity_id_field: entity_id,
+                            "survey_analysis_question_id": analysis_question.id
+                        }
                     )
-                ).first()
-                
-                if not topic:
-                    raise HTTPException(
-                        status_code=404, 
-                        detail=f"Topic with ID {topic_id} not found or not part of the same survey"
-                    )
-                
-                topic_xref = SurveyAnalysisQuestionTopicXref(
-                    survey_question_topic_id=topic_id,
-                    survey_analysis_question_id=analysis_question.id
-                )
-                session.add(topic_xref)
+                    getattr(analysis_question, xref_field).append(xref)
         
-        # Update report segment associations if provided
-        if question_data.report_segment_ids is not None:
-            # Remove existing segment associations
-            session.exec(
-                delete(SurveyAnalysisReportSegmentXref).where(
-                    SurveyAnalysisReportSegmentXref.survey_analysis_question_id == analysis_question_id
-                )
-            )
-            
-            # Add new segment associations
-            for segment_id in question_data.report_segment_ids:
-                # Verify segment exists and belongs to the same survey
-                segment = session.exec(
-                    select(SurveyReportSegment).where(
-                        SurveyReportSegment.id == segment_id,
-                        SurveyReportSegment.survey_id == analysis.survey_id
-                    )
-                ).first()
-                
-                if not segment:
-                    raise HTTPException(
-                        status_code=404, 
-                        detail=f"Report segment with ID {segment_id} not found or not part of the same survey"
-                    )
-                
-                segment_xref = SurveyAnalysisReportSegmentXref(
-                    survey_report_segment_id=segment_id,
-                    survey_analysis_question_id=analysis_question.id
-                )
-                session.add(segment_xref)
+        # Update topics
+        update_xref_relationships(
+            xref_type=SurveyAnalysisQuestionTopicXref,
+            entity_type=SurveyQuestionTopic,
+            xref_field="topic_xrefs",
+            id_list=question_data.topic_ids,
+            entity_id_field="survey_question_topic_id"
+        )
         
+        # Update segments
+        update_xref_relationships(
+            xref_type=SurveyAnalysisReportSegmentXref,
+            entity_type=SurveyReportSegment,
+            xref_field="segment_xrefs",
+            id_list=question_data.report_segment_ids,
+            entity_id_field="survey_report_segment_id"
+        )
+        
+        # Save changes
         session.add(analysis_question)
         session.commit()
-        session.refresh(analysis_question)
         
-        return SurveyAnalysisQuestionGet.from_orm(analysis_question)
+        # Return refreshed question
+        return SurveyAnalysisQuestionGet.from_orm(load_analysis_question())
     
     def delete_survey_analysis_question(
         self,

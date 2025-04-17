@@ -91,7 +91,6 @@ class AnswerGet(BaseModel):
     selected_options: Optional[Dict[str, Any]] = None
     file_path: Optional[str] = None
     answered_at: datetime
-    question: QuestionGet
     items: List[AnswerItemGet] = []
     
     class Config:
@@ -175,6 +174,8 @@ class SurveyResponseCreate(BaseModel):
     ip_address: Optional[str] = None
     user_agent: Optional[str] = None
     response_metadata: Optional[Dict[str, Any]] = None
+    is_complete: bool = False
+    completed_at: Optional[datetime] = None
     answers: List[AnswerCreate] = []
 
 class SurveyResponseUpdate(BaseModel):

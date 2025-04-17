@@ -41,8 +41,24 @@ class SurveyAnalysisQuestion(UUIDBaseMixin, table=True):
     survey_analysis: SurveyAnalysis = Relationship(back_populates="analysis_questions")
     question: Question = Relationship(back_populates="analysis_questions")
     chart_type: ChartType = Relationship(back_populates="analysis_questions")
-    topic_xrefs: List["SurveyAnalysisQuestionTopicXref"] = Relationship(back_populates="survey_analysis_question")
-    segment_xrefs: List["SurveyAnalysisReportSegmentXref"] = Relationship(back_populates="survey_analysis_question")
+    topic_xrefs: List["SurveyAnalysisQuestionTopicXref"] = Relationship(
+        back_populates="survey_analysis_question",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+    segment_xrefs: List["SurveyAnalysisReportSegmentXref"] = Relationship(
+        back_populates="survey_analysis_question",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+    
+    @property
+    def topics(self) -> List["SurveyQuestionTopic"]:
+        """Get the topics associated with this analysis question."""
+        return [xref.survey_question_topic for xref in self.topic_xrefs]
+
+    @property
+    def report_segments(self) -> List["SurveyReportSegment"]:
+        """Get the report segments associated with this analysis question."""
+        return [xref.survey_report_segment for xref in self.segment_xrefs]
 
 
 class SurveyQuestionTopic(UUIDBaseMixin, table=True):

@@ -34,6 +34,7 @@ class SurveyAnalysisQuestionGet(BaseModel):
     chart_type: ChartTypeGet
     question: QuestionGet
     topics: List[SurveyQuestionTopicGet] = []
+    report_segments: List[SurveyReportSegmentGet] = []
     
     class Config:
         from_attributes = True

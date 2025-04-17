@@ -34,7 +34,6 @@ def upgrade():
         # This is a basic implementation - for more complex SQL you might need a proper SQL parser
         statements = sql_content.split(';')
         
-        op.execute("SET CONSTRAINTS ALL DEFERRED;")
         for statement in statements:
             statement = statement.strip()
             if statement:  # Skip empty statements

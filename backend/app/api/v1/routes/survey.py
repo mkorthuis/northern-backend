@@ -234,6 +234,31 @@ def delete_survey_response(
         response_id=response_id
     )
 
+@router.delete("/{survey_id}/responses", 
+    status_code=status.HTTP_200_OK,
+    summary="Delete all survey responses",
+    description="Deletes all responses for a specific survey",
+    response_description="Count of deleted responses")
+def delete_all_survey_responses(
+    survey_id: UUID = Path(..., description="The ID of the survey to delete all responses for"),
+    session: SessionDep = SessionDep
+):
+    """
+    Delete all responses for a specific survey.
+    
+    This operation cannot be undone. All responses and their associated answers
+    will be deleted due to cascading deletes.
+    
+    Parameters:
+    - **survey_id**: UUID of the survey to delete responses for
+    
+    Returns a count of how many responses were deleted.
+    """
+    return survey_service.delete_all_survey_responses(
+        session=session, 
+        survey_id=survey_id
+    )
+
 @router.get("/{survey_id}/responses", 
     response_model=PaginatedSurveyResponses,
     summary="Get survey responses",

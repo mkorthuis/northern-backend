@@ -967,6 +967,59 @@ class SurveyService:
         
         return True
 
+    def delete_all_survey_responses(
+        self,
+        session: Session,
+        survey_id: UUID
+    ) -> Dict[str, Any]:
+        """
+        Delete all responses for a specific survey.
+        
+        Args:
+            session: Database session
+            survey_id: ID of the survey to delete responses for
+            
+        Returns:
+            Dictionary containing the count of deleted responses
+            
+        Raises:
+            HTTPException: If the survey is not found
+        """
+        # Verify survey exists
+        survey = session.exec(select(Survey).where(Survey.id == survey_id)).first()
+        if not survey:
+            raise HTTPException(status_code=404, detail=f"Survey with ID {survey_id} not found")
+        
+        # Get all survey responses for this survey
+        statement = select(SurveyResponse).where(SurveyResponse.survey_id == survey_id)
+        responses = session.exec(statement).all()
+        
+        # Count responses before deletion
+        response_count = len(responses)
+        
+        if response_count > 0:
+            # Get all answer IDs for these responses
+            response_ids = [response.id for response in responses]
+            answer_statement = select(Answer).where(Answer.response_id.in_(response_ids))
+            answers = session.exec(answer_statement).all()
+            answer_ids = [answer.id for answer in answers]
+            
+            # First delete all answer items
+            if answer_ids:
+                session.exec(delete(AnswerItem).where(AnswerItem.answer_id.in_(answer_ids)))
+                session.flush()
+            
+            # Then delete all answers
+            if response_ids:
+                session.exec(delete(Answer).where(Answer.response_id.in_(response_ids)))
+                session.flush()
+            
+            # Finally delete all responses
+            session.exec(delete(SurveyResponse).where(SurveyResponse.survey_id == survey_id))
+            session.commit()
+        
+        return {"deleted_count": response_count}
+
     # --- BULK OPERATIONS ---
     def create_bulk_survey_responses(
         self,

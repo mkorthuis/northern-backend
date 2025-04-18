@@ -9,14 +9,16 @@ from app.model.survey import Survey, Question
 from app.model.survey_analysis import (
     ChartType, SurveyAnalysis, SurveyAnalysisQuestion,
     SurveyQuestionTopic, SurveyAnalysisQuestionTopicXref,
-    SurveyReportSegment, SurveyAnalysisReportSegmentXref
+    SurveyReportSegment, SurveyAnalysisReportSegmentXref,
+    SurveyAnalysisFilter, SurveyAnalysisFilterCriteria
 )
 from app.schema.survey_analysis_schema import (
     SurveyAnalysisGet, SurveyAnalysisCreate, SurveyAnalysisUpdate,
     SurveyAnalysisQuestionGet, SurveyAnalysisQuestionCreate, SurveyAnalysisQuestionUpdate,
     SurveyQuestionTopicGet, SurveyQuestionTopicCreate, SurveyQuestionTopicUpdate,
     SurveyReportSegmentGet, SurveyReportSegmentCreate, SurveyReportSegmentUpdate,
-    ChartTypeGet
+    ChartTypeGet, SurveyAnalysisFilterGet, SurveyAnalysisFilterCreate, 
+    SurveyAnalysisFilterUpdate, SurveyAnalysisFilterCriteriaGet, SurveyAnalysisFilterCriteriaCreate
 )
 
 class SurveyAnalysisService:
@@ -364,7 +366,8 @@ class SurveyAnalysisService:
             survey_analysis_id=question_data.survey_analysis_id,
             question_id=question_data.question_id,
             chart_type_id=question_data.chart_type_id,
-            sort_by_value=question_data.sort_by_value
+            sort_by_value=question_data.sort_by_value,
+            is_demographic=question_data.is_demographic
         )
         session.add(analysis_question)
         session.flush()  # Flush to get the ID
@@ -481,6 +484,9 @@ class SurveyAnalysisService:
         
         if question_data.sort_by_value is not None:
             analysis_question.sort_by_value = question_data.sort_by_value
+            
+        if question_data.is_demographic is not None:
+            analysis_question.is_demographic = question_data.is_demographic
         
         # Update relationships
         def update_xref_relationships(
@@ -885,6 +891,198 @@ class SurveyAnalysisService:
         
         # This will cascade to delete all xrefs due to DB constraints
         session.delete(segment)
+        session.commit()
+        
+        return True
+
+    # --- SURVEY ANALYSIS FILTER OPERATIONS ---
+    def get_survey_analysis_filters(
+        self,
+        session: Session,
+        analysis_id: UUID
+    ) -> List[SurveyAnalysisFilterGet]:
+        """
+        Get all filters for a specific survey analysis.
+        
+        Args:
+            session: Database session
+            analysis_id: ID of the survey analysis
+            
+        Returns:
+            List of survey analysis filters
+            
+        Raises:
+            HTTPException: If the survey analysis is not found
+        """
+        # First verify the analysis exists
+        analysis_exists = session.exec(select(SurveyAnalysis).where(SurveyAnalysis.id == analysis_id)).first()
+        if not analysis_exists:
+            raise HTTPException(status_code=404, detail=f"Survey analysis with ID {analysis_id} not found")
+        
+        statement = select(SurveyAnalysisFilter).where(SurveyAnalysisFilter.survey_analysis_id == analysis_id)
+        filters = session.exec(statement).all()
+        
+        return [SurveyAnalysisFilterGet.from_orm(f) for f in filters]
+    
+    def get_survey_analysis_filter(
+        self,
+        session: Session,
+        filter_id: UUID
+    ) -> SurveyAnalysisFilterGet:
+        """
+        Get a specific survey analysis filter by ID.
+        
+        Args:
+            session: Database session
+            filter_id: ID of the filter
+            
+        Returns:
+            Survey analysis filter details
+            
+        Raises:
+            HTTPException: If the filter is not found
+        """
+        statement = select(SurveyAnalysisFilter).where(SurveyAnalysisFilter.id == filter_id)
+        filter_obj = session.exec(statement).first()
+        
+        if not filter_obj:
+            raise HTTPException(status_code=404, detail=f"Survey analysis filter with ID {filter_id} not found")
+            
+        return SurveyAnalysisFilterGet.from_orm(filter_obj)
+    
+    def create_survey_analysis_filter(
+        self,
+        session: Session,
+        filter_data: SurveyAnalysisFilterCreate
+    ) -> SurveyAnalysisFilterGet:
+        """
+        Create a new survey analysis filter.
+        
+        Args:
+            session: Database session
+            filter_data: Data for creating the filter
+            
+        Returns:
+            Newly created survey analysis filter
+            
+        Raises:
+            HTTPException: If the analysis or question is not found
+        """
+        # Verify analysis exists
+        analysis = session.exec(
+            select(SurveyAnalysis).where(SurveyAnalysis.id == filter_data.survey_analysis_id)
+        ).first()
+        if not analysis:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Survey analysis with ID {filter_data.survey_analysis_id} not found"
+            )
+        
+        # Verify analysis question exists and belongs to the same analysis
+        analysis_question = session.exec(
+            select(SurveyAnalysisQuestion).where(
+                SurveyAnalysisQuestion.id == filter_data.survey_analysis_question_id,
+                SurveyAnalysisQuestion.survey_analysis_id == filter_data.survey_analysis_id
+            )
+        ).first()
+        if not analysis_question:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Analysis question with ID {filter_data.survey_analysis_question_id} not found or not part of this analysis"
+            )
+        
+        # Create the filter
+        filter_obj = SurveyAnalysisFilter(
+            survey_analysis_id=filter_data.survey_analysis_id,
+            survey_analysis_question_id=filter_data.survey_analysis_question_id
+        )
+        session.add(filter_obj)
+        session.flush()  # Flush to get the ID
+        
+        # Add criteria if provided
+        if filter_data.criteria:
+            for criterion_data in filter_data.criteria:
+                criterion = SurveyAnalysisFilterCriteria(
+                    survey_analysis_filter_id=filter_obj.id,
+                    value=criterion_data.value
+                )
+                session.add(criterion)
+        
+        session.commit()
+        session.refresh(filter_obj)
+        
+        return SurveyAnalysisFilterGet.from_orm(filter_obj)
+    
+    def update_survey_analysis_filter(
+        self,
+        session: Session,
+        filter_id: UUID,
+        filter_data: SurveyAnalysisFilterUpdate
+    ) -> SurveyAnalysisFilterGet:
+        """
+        Update an existing survey analysis filter.
+        
+        Args:
+            session: Database session
+            filter_id: ID of the filter to update
+            filter_data: Data for updating the filter
+            
+        Returns:
+            Updated survey analysis filter
+            
+        Raises:
+            HTTPException: If the filter is not found
+        """
+        filter_obj = session.exec(select(SurveyAnalysisFilter).where(SurveyAnalysisFilter.id == filter_id)).first()
+        if not filter_obj:
+            raise HTTPException(status_code=404, detail=f"Survey analysis filter with ID {filter_id} not found")
+        
+        # Update criteria if provided
+        if filter_data.criteria is not None:
+            # Delete existing criteria
+            session.exec(
+                delete(SurveyAnalysisFilterCriteria).where(
+                    SurveyAnalysisFilterCriteria.survey_analysis_filter_id == filter_id
+                )
+            )
+            
+            # Add new criteria
+            for criterion_data in filter_data.criteria:
+                criterion = SurveyAnalysisFilterCriteria(
+                    survey_analysis_filter_id=filter_id,
+                    value=criterion_data.value
+                )
+                session.add(criterion)
+        
+        session.commit()
+        session.refresh(filter_obj)
+        
+        return SurveyAnalysisFilterGet.from_orm(filter_obj)
+    
+    def delete_survey_analysis_filter(
+        self,
+        session: Session,
+        filter_id: UUID
+    ) -> bool:
+        """
+        Delete a survey analysis filter.
+        
+        Args:
+            session: Database session
+            filter_id: ID of the filter to delete
+            
+        Returns:
+            True if deletion was successful
+            
+        Raises:
+            HTTPException: If the filter is not found
+        """
+        filter_obj = session.exec(select(SurveyAnalysisFilter).where(SurveyAnalysisFilter.id == filter_id)).first()
+        if not filter_obj:
+            raise HTTPException(status_code=404, detail=f"Survey analysis filter with ID {filter_id} not found")
+        
+        # This will cascade to delete all criteria due to DB constraints
+        session.delete(filter_obj)
         session.commit()
         
         return True

@@ -27,6 +27,10 @@ class SurveyAnalysis(UUIDBaseMixin, table=True):
     # Relationships
     survey: Survey = Relationship(back_populates="analyses")
     analysis_questions: List["SurveyAnalysisQuestion"] = Relationship(back_populates="survey_analysis")
+    filters: List["SurveyAnalysisFilter"] = Relationship(
+        back_populates="survey_analysis",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
 
 
 class SurveyAnalysisQuestion(UUIDBaseMixin, table=True):
@@ -36,6 +40,7 @@ class SurveyAnalysisQuestion(UUIDBaseMixin, table=True):
     question_id: UUID = Field(foreign_key="question.id")
     chart_type_id: int = Field(foreign_key="chart_type.id")
     sort_by_value: bool = Field(default=False)
+    is_demographic: bool = Field(default=False)
     
     # Relationships
     survey_analysis: SurveyAnalysis = Relationship(back_populates="analysis_questions")
@@ -49,6 +54,14 @@ class SurveyAnalysisQuestion(UUIDBaseMixin, table=True):
         back_populates="survey_analysis_question",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
+    answer_transforms: List["SurveyAnalysisAnswerTransform"] = Relationship(
+        back_populates="survey_analysis_question",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+    filters: List["SurveyAnalysisFilter"] = Relationship(
+        back_populates="survey_analysis_question",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
     
     @property
     def topics(self) -> List["SurveyQuestionTopic"]:
@@ -59,6 +72,43 @@ class SurveyAnalysisQuestion(UUIDBaseMixin, table=True):
     def report_segments(self) -> List["SurveyReportSegment"]:
         """Get the report segments associated with this analysis question."""
         return [xref.survey_report_segment for xref in self.segment_xrefs]
+
+
+class SurveyAnalysisAnswerTransform(UUIDBaseMixin, table=True):
+    __tablename__ = "survey_analysis_answer_transform"
+    
+    survey_analysis_question_id: UUID = Field(foreign_key="survey_analysis_question.id")
+    original_answer: str
+    new_answer: str
+    new_order_id: int
+    
+    # Relationships
+    survey_analysis_question: SurveyAnalysisQuestion = Relationship(back_populates="answer_transforms")
+
+
+class SurveyAnalysisFilter(UUIDBaseMixin, table=True):
+    __tablename__ = "survey_analysis_filter"
+    
+    survey_analysis_id: UUID = Field(foreign_key="survey_analysis.id")
+    survey_analysis_question_id: UUID = Field(foreign_key="survey_analysis_question.id")
+    
+    # Relationships
+    survey_analysis: SurveyAnalysis = Relationship(back_populates="filters")
+    survey_analysis_question: SurveyAnalysisQuestion = Relationship(back_populates="filters")
+    criteria: List["SurveyAnalysisFilterCriteria"] = Relationship(
+        back_populates="survey_analysis_filter",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+
+
+class SurveyAnalysisFilterCriteria(UUIDBaseMixin, table=True):
+    __tablename__ = "survey_analysis_filter_criteria"
+    
+    survey_analysis_filter_id: UUID = Field(foreign_key="survey_analysis_filter.id")
+    value: str
+    
+    # Relationships
+    survey_analysis_filter: SurveyAnalysisFilter = Relationship(back_populates="criteria")
 
 
 class SurveyQuestionTopic(UUIDBaseMixin, table=True):

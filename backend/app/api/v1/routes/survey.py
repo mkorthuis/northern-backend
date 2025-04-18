@@ -251,7 +251,7 @@ def get_survey_responses(
     Parameters:
     - **survey_id**: UUID of the survey to get responses for
     - **page**: Page number (starts from 1)
-    - **page_size**: Number of items per page (max 100)
+    - **page_size**: Number of items per page (max 100000)
     - **completed_only**: If true, only return completed responses
     - **started_after**: Filter responses started after this datetime
     - **started_before**: Filter responses started before this datetime
